@@ -1,4 +1,4 @@
 emacsteroids
 ============
 
-An asteroids clone disguised as emacs
+A half-assed Python asteroids clone disguised as emacs
