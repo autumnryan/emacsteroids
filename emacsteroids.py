@@ -276,6 +276,7 @@ class Level:
             self.width = max(len(line), self.width)
             self.height+=1
         self.height = max(min_height, self.height)
+#        import pdb; pdb.set_trace()
 
         self.map = curses.newpad(self.height+1, self.width+1)
         self.objectpad = curses.newpad(self.height+1, self.width+1)
@@ -351,7 +352,7 @@ class CursesDisplay:
         maxx -= 1
 
         self.viewbox = Box(width=maxx,
-                           height=maxy-1,
+                           height=maxy,
                            position=Vec(0,0))
 
         self.scrollbox = Box(width=int(self.viewbox.width/3),
@@ -359,7 +360,7 @@ class CursesDisplay:
                              position=Vec(int(self.viewbox.width/3),
                                           int(self.viewbox.height/3)))
 
-        # Our modifier represents the current 'imaginary menu naviation' state
+        # Our modifier represents the current 'imaginary menu navigation' state
         # (e.g. C-x after user has pushed that)
         self.modifier = []                #XXX bad naming
         self.modifierbox = Box(width=maxx, height=1, position=Vec(0,maxy))
@@ -382,7 +383,7 @@ class CursesDisplay:
 
         self.viewbox.position.y = clamp(self.viewbox.position.y,
                                         0,
-                                        self.levelsize.height - self.viewbox.height)
+                                        self.levelsize.height - (self.viewbox.height-2))
         self.viewbox.position.x = clamp(self.viewbox.position.x,
                                         0,
                                         self.levelsize.width - self.viewbox.width)
@@ -470,12 +471,9 @@ class CursesDisplay:
         curses.endwin()
 
 def main(argv):
-    if len(argv) != 2:
-        print "Usage: %s filename" % argv[0]
-        return
-
-    nextlevel = argv[1]
+    nextlevel = 'README.md'#argv[1] if len(argv) >= 2 else 'README.md'
     # XXX this could be better...
+#    import pdb; pdb.set_trace()
     while nextlevel:
         engine = Engine()
         engine.load_level(nextlevel)
