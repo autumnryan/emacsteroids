@@ -5,6 +5,8 @@ import sys
 import copy
 import math
 import curses
+import curses.ascii
+import curses.textpad
 import random
 import time
 
@@ -319,10 +321,11 @@ class Engine:
         return newpoints
 
     def run(self):
-        '''Main game loop. Each iteration should take at least TICK time'''
+        '''Main game loop. TODO: Make each loop iteration a fixed/minimum
+        length, without making the input all shitty.'''
         while True:
             if not self.display.process_input(self.player, self.moving_things):
-                break
+                return self.display.nextlevel   #XXX wow. just wow.
             self.points += self.resolve_movement(self.moving_things, self.level)
             self.display.draw_screen(self.player, self.level, self.moving_things, self.points)
 
@@ -339,6 +342,9 @@ class CursesDisplay:
         
         self.levelsize = Box(0,0)
         self.levelname = "No level"
+        # XXX this really doesn't belong in the display class,
+        # but it's an unfortunate side effect of using curses input
+        self.nextlevel = None
 
         maxy, maxx = self.screen.getmaxyx()
         maxy -= 1
@@ -352,6 +358,12 @@ class CursesDisplay:
                              height=int(self.viewbox.height/3),
                              position=Vec(int(self.viewbox.width/3),
                                           int(self.viewbox.height/3)))
+
+        # Our modifier represents the current 'imaginary menu naviation' state
+        # (e.g. C-x after user has pushed that)
+        self.modifier = []                #XXX bad naming
+        self.modifierbox = Box(width=maxx, height=1, position=Vec(0,maxy))
+        self.modifierwin = curses.newwin(1,self.modifierbox.width,self.viewbox.height,0)
 
     def set_level(self, level):
         self.levelsize = level.boundaries
@@ -382,23 +394,46 @@ class CursesDisplay:
             msg1 = '-UU-:**--F1  '
         msg2 = ' Points: %d   (%d,%d)   (Pewpew)' % (points, player.position.x, player.position.y)
 
-        self.screen.addstr(self.viewbox.height, 0, msg1, curses.A_REVERSE)
+        self.screen.addstr(self.viewbox.height-1, 0, msg1, curses.A_REVERSE)
         self.screen.addstr(self.levelname, curses.A_BOLD | curses.A_REVERSE)
         self.screen.addstr(msg2, curses.A_REVERSE)
         remaining_width = self.viewbox.width-len(msg1)-len(self.levelname)-len(msg2)
         self.screen.addstr('-'*remaining_width, curses.A_REVERSE)
 
+    def add_inputbar(self):
+        mode_str = '-'.join(self.modifier)
+        self.modifierwin.addstr(0, 0, '%s' % mode_str)
+        self.modifierwin.overlay(
+            self.screen, 0, 0, self.viewbox.height, 0,
+            self.viewbox.height, self.viewbox.width)
+        return len(mode_str)
+
     def process_input(self, player, moving_things):
-        c = self.screen.getch()
-        if c == ord('x'):
-            return False
-        elif c in player.keymap.keys():
+        # Hey you know what a user would love? Let's hijack ctrl-c!
+        try:
+            c = self.screen.getch()
+        except KeyboardInterrupt:
+            c = ord(curses.ascii.ctrl('c'))
+
+        if c in player.keymap.keys():
             player.resolve_input(c)
         elif c == ord(' '):
             player.pewpew(moving_things)
         elif c == ord('l'):
             player.boom(moving_things)
-
+        elif c == ord(curses.ascii.ctrl('x')):
+            self.modifier = ['C-x']
+        # XXX this feels dirty, should handle modifier better
+        elif self.modifier == ['C-x'] and c == ord(curses.ascii.ctrl('c')):
+            return False
+        elif self.modifier == ['C-x'] and c == ord(curses.ascii.ctrl('f')):
+            self.modifier = ['Find file: ']
+            os = self.add_inputbar()
+            tb = curses.textpad.Textbox(self.modifierwin)
+            self.nextlevel = tb.edit()[os:].strip()
+            return False
+        elif c == ord(curses.ascii.ctrl('g')):
+            self.modifier = []
         return True
 
     def draw_screen(self, player, level, moving_things, points):
@@ -411,10 +446,11 @@ class CursesDisplay:
             moving_thing.draw(level.objectpad, self.viewbox)
 
         level.map.overlay(self.screen, self.viewbox.top(), self.viewbox.left(), 0, 0,
-                          self.viewbox.height-1, self.viewbox.width)
+                          self.viewbox.height-2, self.viewbox.width)
         level.objectpad.overlay(self.screen, self.viewbox.top(), self.viewbox.left(), 0, 0,
-                                self.viewbox.height-1, self.viewbox.width)
+                                self.viewbox.height-2, self.viewbox.width)
         self.add_status(points, player)
+        self.add_inputbar()
 
         curses.doupdate()
 
@@ -438,9 +474,12 @@ def main(argv):
         print "Usage: %s filename" % argv[0]
         return
 
-    engine = Engine()
-    engine.load_level(argv[1])
-    engine.run()
+    nextlevel = argv[1]
+    # XXX this could be better...
+    while nextlevel:
+        engine = Engine()
+        engine.load_level(nextlevel)
+        nextlevel = engine.run()
     engine.shutdown()
 
     # Stopgap until I can get curses deinit to behave
@@ -448,4 +487,3 @@ def main(argv):
 
 if __name__ == "__main__":
     main(sys.argv)
-        
