@@ -268,7 +268,11 @@ class Boom(MovingThing):
     
 class Level:
     def __init__(self, filename, min_width=0, min_height=0):
-        f = open(filename, 'r')
+        try:
+            f = open(filename, 'r')
+        except IOError:
+            filename = 'README.md'
+            f = open('README.md', 'r')
         self.name = filename
         self.width = min_width
         self.height = 1
@@ -276,7 +280,6 @@ class Level:
             self.width = max(len(line), self.width)
             self.height+=1
         self.height = max(min_height, self.height)
-#        import pdb; pdb.set_trace()
 
         self.map = curses.newpad(self.height+1, self.width+1)
         self.objectpad = curses.newpad(self.height+1, self.width+1)
@@ -471,9 +474,8 @@ class CursesDisplay:
         curses.endwin()
 
 def main(argv):
-    nextlevel = 'README.md'#argv[1] if len(argv) >= 2 else 'README.md'
+    nextlevel = argv[1] if len(argv) >= 2 else 'README.md'
     # XXX this could be better...
-#    import pdb; pdb.set_trace()
     while nextlevel:
         engine = Engine()
         engine.load_level(nextlevel)
